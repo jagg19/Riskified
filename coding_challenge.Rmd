@@ -1,0 +1,229 @@
+---
+title: "Riskified Test - Jagger Villalobos"
+output:
+  html_document:
+    df_print: paged
+---
+
+<br>
+
+
+Packages used for this analysis were the following;
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+```
+
+<br>
+
+#Summary
+This challenge was a **great** exercise to implement the tidyverse package for its data-wrangling power and pipe functions for readability. Most of the syntax for tidyverse has similar function calls/verbs as SQL, so it is ideal for transforming data and sharing the results with other R & SQL users. I also harnessed the flexibility and power of the ggplot2 package for our data visualization questions. 
+
+<br>
+
+#Reading the data
+Setting column types to appropiate values which will be faster for larger data sets.
+```{r}
+test_data <- read_csv("/Users/jagvill/Desktop/Operations & Research Analyst - Test.csv", col_types= "ccd")
+```
+
+<br>
+
+#Question 1
+Draw a boxplot showing the area size distribution for each shape.
+```{r Question 1}
+ggplot(test_data, aes(shape,area)) + 
+  geom_boxplot(varwidth=F, fill="plum") + 
+  geom_jitter(shape=20, position=position_jitter(0.15)) + 
+  labs(
+    title="Boxplot",
+    subtitle="Size of Area by Shape",
+    caption="Source: Riskified Coding Interview Test",
+    x="Shape",
+    y="Area"
+  )
+```
+
+<br>
+
+#Question 2
+Calculate the mean, max, and standard deviation of the area size of each color.
+```{r Question 2}
+test_data %>% group_by(color) %>% summarize(Mean = mean(area), Max = max(area), St.Dev = sd(area))
+```
+
+<br>
+
+#Question 3
+What is the average area size of a yellow square?
+```{r Question 3}
+test_data %>% 
+  group_by(shape, color) %>% 
+  filter(color == "yellow" & shape == "square") %>% 
+  summarize(Avg.Area = mean(area))
+```
+
+
+<br>
+
+#Question 4
+Which shape is most likely to be green?
+
+> The shape that is most likely to be green is a **square**, with **60.25%** probaility that a green shape is a square. I considered a simple approach of using the MODE, but decided to look at the probabilty outcomes. 
+
+```{r Question 4}
+
+
+#Table containing the counts for shape and colors. Using MODE, if a green color shape was selected, then it will most likely be a square. 
+table(test_data$shape,test_data$color)
+
+
+#Probability Approach
+test_data %>% 
+  filter(color == "green") %>% 
+  group_by(shape) %>% 
+  summarize(counts = n()) %>% 
+  mutate(proportions = counts/sum(counts))
+
+```
+
+
+<br>
+
+#Question 5
+Given the fact the the object is red, with an area size larger than 3,000 - what are the chances the object is a square? a triangle? a circle?
+
+> Using probabilty to find the chances, we can see that there is a **16.8%** chance that it will be a square, **16%** chance that it will be a circle, and a **67.2%** chance that it will be a triangle given the constraints stated in the question. We can implement classification models when we want to predict an outcome given certain data but was not necessary here. 
+
+```{r Question 5}
+
+red3k_shapes <- test_data %>% filter(color == "red" & area > 3000)
+prop.table(table(red3k_shapes$shape,red3k_shapes$color))
+
+```
+
+
+<br>
+
+#Question 6
+Write a function that calculates the side or radius of an object, depending on the shape and area of the object [for an Equilateral triangle - area = (side ^ 2) * sqrt(3) / 4].
+
+
+```{r Question 6}
+# Applying a pseudo-open/closed principle, so if additonal shapes are added, no modification to our "side.radius.calc" function is needed. Less conditionals as well.
+
+sides <- list(
+			circle = function(area)sqrt(area/pi),
+			triangle = function(area)sqrt(area/(sqrt(3)/4)),
+			square = function(area)sqrt(area)
+			)
+
+
+side.radius.calc <- function(area, shape){
+	sides[[shape]](area)
+}
+```
+
+
+<br>
+
+#Question 7
+Add a column to the dataset called "side" that shows the size matching the area in each row, round that number to the closest integer (shape side or radios).
+```{r Question 7}
+test_side_data <- test_data %>% 
+                  mutate(side = map2(area, shape, side.radius.calc)) %>% 
+                  unnest() %>% 
+                  mutate(side = round(side))
+
+# Print first 5 rows
+head(test_side_data,5)
+```
+
+
+<br>
+
+#Question 8
+Draw a boxplot showing the side size distribution for each shape - what can you infer from this plot?
+
+> Looking at the Boxplot results, we can see that the square & triangle shapes have greater density than the circle shapes, as there are greater observations. The variability in side lengths for circle & square are similar, but the variability is much greater for triangle shapes.
+
+```{r Question 8}
+
+ggplot(test_side_data, aes(shape,side)) + 
+  geom_boxplot(varwidth=F, fill="plum") + 
+  geom_jitter(shape=20,position=position_jitter(0.15)) + 
+  labs(
+    title="Boxplot",
+    subtitle="Side size by Shape",
+    caption="Source: Riskified Coding Interview Test",
+    x="Shape",
+    y="Side Length"
+  )
+```
+
+<br>
+
+#Question 9
+Make a scatter plot with "side" on the x axis, "area" on the y axis with a different color for each shape.
+```{r Question 9}
+ggplot(test_side_data, aes(side, area, shape = shape, color = shape)) + 
+  geom_point() + 
+  scale_shape_manual(values = c(16,15,17)) + 
+  labs(
+    title="Scatterplot", 
+    subtitle="Area~Side", 
+    caption="Source: Riskified Coding Interview Test",
+    x="Side",
+    y="Area"
+  )
+```
+
+<br>
+
+#Question 10
+A. The proportion of red objects within the shape.
+
+B. The proporation of blue area out of the shapes total area (sum of square inch blue area of the shape, over sum of all shape size).
+```{r Question 10}
+#A. 
+test_data %>% 
+  group_by(shape) %>% 
+  mutate(shape_count = n()) %>% 
+  group_by(shape,color) %>% 
+  mutate(shape_total_colors = n()) %>% 
+  summarize(proportions = unique(shape_total_colors/shape_count)) %>% 
+  filter(color=="red")
+
+#B. 
+test_data %>% 
+  group_by(shape) %>% 
+  mutate(total_shape_sqft = sum(area)) %>% 
+  group_by(shape,color) %>% 
+  mutate(total_shape_colors_sqft = sum(area)) %>% 
+  summarize(proportions = unique(total_shape_colors_sqft/total_shape_sqft)) 
+```
+
+<br>
+
+#Question 11
+Create a function that calculates 10.B for any given shape and color 
+```{r Question 11}
+proportions <- function(df, selection = NULL){
+	
+  #Get proportions for all shapes and colors, then we can filter for any aruements like color.
+	res <- test_data %>% 
+	  group_by(shape) %>% 
+	  mutate(total_shape_sqft = sum(area)) %>% 
+	  group_by(shape,color) %>% 
+	  mutate(total_shape_colors_sqft = sum(area)) %>% 
+	  summarize(proportions = unique(total_shape_colors_sqft/total_shape_sqft)) 
+	
+	#Check if "selection" is NULL, and if not then filter for color.
+	if(!is.null(selection)) res <- res %>% ungroup() %>% filter(color == selection)
+	return(res)
+}
+```
+
+
+
+#Thank you 
+This was a ton of fun! I really appreciate the opporutnity and I look forward to discussing my results with the rest of the riskified team!
